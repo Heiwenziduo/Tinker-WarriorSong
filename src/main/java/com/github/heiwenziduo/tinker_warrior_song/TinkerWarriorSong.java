@@ -1,5 +1,6 @@
 package com.github.heiwenziduo.tinker_warrior_song;
 
+import com.github.heiwenziduo.tinker_warrior_song.initializer.InitModifier;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -9,14 +10,14 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
-// The value here should match an entry in the META-INF/mods.toml file
 @Mod(TinkerWarriorSong.ModId)
 public class TinkerWarriorSong {
-    // Define mod id in a common place for everything to reference
     public static final String ModId = "tinker_warrior_song";
 
     public TinkerWarriorSong(FMLJavaModLoadingContext context) {
-        IEventBus modEventBus = context.getModEventBus();
+        IEventBus eventBus = context.getModEventBus();
+
+        InitModifier.register(eventBus);
 
 
         MinecraftForge.EVENT_BUS.register(this);
