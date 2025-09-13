@@ -158,6 +158,12 @@ repositories {
         }
     }
 
+    // TConstruct
+    maven {
+        name 'DVS1 Maven FS'
+        url 'https://dvs1.progwml6.com/files/maven'
+    }
+
 }
 
 dependencies {
@@ -169,7 +175,11 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     // Apply Mixin AP
-    // annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+
+    // TConstruct
+    implementation fg.deobf("slimeknights.mantle:Mantle:${minecraft_version}-${mantle_build}")
+    implementation fg.deobf("slimeknights.tconstruct:TConstruct:${minecraft_version}-${tinkers_build}")
 
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -188,12 +198,12 @@ dependencies {
 }
 
 // MixinGradle Settings
-//mixin {
-//    add sourceSets.main, 'a.mixin.refmap.json'
-//    config 'a.mixin.json'
-//    debug.verbose = true
-//    debug.export = true
-//}
+mixin {
+    add sourceSets.main, 'tinker_warrior_song.mixin.refmap.json'
+    config 'tinker_warrior_song.mixin.json'
+    debug.verbose = true
+    debug.export = true
+}
 
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
