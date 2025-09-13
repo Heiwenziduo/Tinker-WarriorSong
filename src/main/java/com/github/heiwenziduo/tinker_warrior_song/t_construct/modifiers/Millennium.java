@@ -35,6 +35,7 @@ import slimeknights.tconstruct.tools.stats.ToolType;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /// 千年, 即 630,720,000,000 tick
 public class Millennium extends NoLevelsModifier implements
@@ -45,27 +46,7 @@ public class Millennium extends NoLevelsModifier implements
 
     private static final ResourceLocation MILLENNIUM_TIME = ResourceLocation.fromNamespaceAndPath(TinkerWarriorSong.ModId, "millennium_time");
     private static final ResourceLocation MILLENNIUM_ACTIVE = ResourceLocation.fromNamespaceAndPath(TinkerWarriorSong.ModId, "millennium_active");
-
-    public enum RANK {
-        SSS(630720000000f),
-        SS (63072000000f),
-        S  (6307200000f),
-        A  (630720000f),
-        B  (63072000f),
-        C  (6307200f),
-        D  (630720f),
-        E  (0f);
-
-        public float tickRequired;
-
-        public RANK nextRank() {
-            var l = Arrays.stream(RANK.values()).filter(r -> r.tickRequired >= tickRequired).toList();
-            return l.get(l.size() - 1);
-        }
-
-        RANK(float tickRequired) {
-        }
-    }
+    private static final ResourceLocation MILLENNIUM_RANK = ResourceLocation.fromNamespaceAndPath(TinkerWarriorSong.ModId, "millennium_rank");
 
     @Override
     public int getPriority() {
@@ -79,8 +60,16 @@ public class Millennium extends NoLevelsModifier implements
 
     @Override
     public void addToolStats(IToolContext context, ModifierEntry modifier, ModifierStatsBuilder builder) {
+        // "Called whenever tool stats are rebuilt."
+        // todo: consider @AttributesModifierHook
+        System.out.println("addToolStats: " + context.getPersistentData().getBoolean(MILLENNIUM_ACTIVE)); // false, then stop update
         if(!context.getPersistentData().getBoolean(MILLENNIUM_ACTIVE)) return;
-        HookHelper.runAddToolStats(context, modifier, builder);
+        //HookHelper.runAddToolStats(context, modifier, builder);
+        String rankName = context.getPersistentData().getString(MILLENNIUM_RANK);
+        System.out.println("addToolStats: " + rankName);
+        if (rankName.isEmpty()) rankName = RANK.E.name;
+        RANK R = RANK.fromName(rankName);
+        HookHelper.runAddToolStats(R, modifier, builder);
     }
 
     @Override
@@ -104,8 +93,11 @@ public class Millennium extends NoLevelsModifier implements
     @Override
     public void onInventoryTick(IToolStackView tool, ModifierEntry modifier, Level world, LivingEntity holder, int itemSlot, boolean isSelected, boolean isCorrectSlot, ItemStack stack) {
         if (!canModified(tool)) return;
-        if (!isActive(tool)) return;
+        if(world.isClientSide) return;  // tick会在客户端执行
+        if (holder.tickCount % 100 == 0) calculateRankAndSave(tool);
         // if (!(holder instanceof Player player)) return;
+
+        if (!isActive(tool)) return;
 
         float time = tool.getPersistentData().getFloat(MILLENNIUM_TIME);
         if (time >= TickConsumePerT) {
@@ -128,7 +120,6 @@ public class Millennium extends NoLevelsModifier implements
 
     @Override
     public void onFinishUsing(IToolStackView tool, ModifierEntry modifier, LivingEntity entity) {
-        System.out.println("onFinishUsing: isClientSide? " + entity.level().isClientSide);
         if (!canModified(tool)) return;
 
         if (!tool.isBroken() && entity instanceof Player player) {
@@ -152,27 +143,27 @@ public class Millennium extends NoLevelsModifier implements
 
         double sec = Math.floor(tool.getPersistentData().getFloat(MILLENNIUM_TIME) / 20);
         RANK R = calculateRank(tool);
-        tooltip.add(Component.literal("已积攒时间: " + (Double.isNaN(sec) ? 0 : sec) + "秒"));
+        tooltip.add(Component.literal("已积攒: " + (Double.isNaN(sec) ? 0 : sec) + "秒"));
         tooltip.add(Component.literal("位阶: " + R));
-        tooltip.add(Component.literal("离下一位阶还有: " + (Math.floor(R.nextRank().tickRequired / 20) - sec) + "秒"));
+        tooltip.add(Component.literal("离下一阶还有: " + (Math.floor(R.nextRank().tickRequired / 20) - sec) + "秒"));
     }
 
 
-
-
+    private static RANK calculateRankAndSave(IToolStackView tool) {
+        RANK R = calculateRank(tool);
+        tool.getPersistentData().putString(MILLENNIUM_RANK, R.name);
+        System.out.println("calculateRankAndSave: " + R.name);
+        return R;
+    }
     private static RANK calculateRank(IToolStackView tool) {
         float ticks = tool.getPersistentData().getFloat(MILLENNIUM_TIME);
         return calculateRank(ticks);
     }
     private static RANK calculateRank(float ticks) {
         RANK rank = RANK.E;
-//        var optional = Arrays.stream(RANK.values()).filter(R -> ticks >= R.tickRequired).findFirst();
-//        if (optional.isPresent()) {
-//            rank = optional.get();
-//        }
-        for(RANK c : RANK.values()){
-            if(ticks >= c.tickRequired) {
-                rank = c;
+        for(RANK r : RANK.values()){
+            if(ticks >= r.tickRequired) {
+                rank = r;
                 break;
             }
         }
@@ -205,6 +196,7 @@ public class Millennium extends NoLevelsModifier implements
         return type != null;
     }
 
+    // ****************************************************************************
     private static class HookHelper {
         public static void calculateTooltip() {
 
@@ -213,6 +205,10 @@ public class Millennium extends NoLevelsModifier implements
         public static void runAddToolStats(IToolContext context, ModifierEntry modifier, ModifierStatsBuilder builder) {
             float ticks = context.getPersistentData().getFloat(MILLENNIUM_TIME);
             RANK R = calculateRank(ticks);
+            runAddToolStats(R, modifier, builder);
+        }
+        public static void runAddToolStats(RANK R, ModifierEntry modifier, ModifierStatsBuilder builder) {
+            System.out.println("runAddToolStats: " + R.name);
             switch (R) {
                 case E -> {
                     ToolStats.ATTACK_DAMAGE.multiplyAll(builder, 1.1);
@@ -227,6 +223,41 @@ public class Millennium extends NoLevelsModifier implements
                     ToolStats.ATTACK_SPEED.add(builder, 0.4);
                 }
             }
+        }
+
+    }
+
+    public enum RANK {
+        SSS("SSS", 630720000000f),
+        SS ("SS",  63072000000f),
+        S  ("S",   6307200000f),
+        A  ("A",   630720000f),
+        B  ("B",   63072000f),
+        C  ("C",   6307200f),
+        D  ("D",   630720f),
+        E  ("E",   0f);
+
+        public final float tickRequired;
+        public final String name;
+
+        public RANK nextRank() {
+            var l = Arrays.stream(RANK.values()).filter(r -> r.tickRequired > this.tickRequired).toList();
+            return l.isEmpty() ? RANK.SSS : l.get(l.size() - 1);
+        }
+
+        public static RANK fromName(String name) {
+            for (RANK R : RANK.values()) {
+                if (Objects.equals(R.name, name)){
+                    return R;
+                }
+            }
+            System.out.println("RANK#fromNameErrot: noSuchName");
+            return RANK.E;
+        }
+
+        RANK(String name, float tickRequired) {
+            this.name = name;
+            this.tickRequired = tickRequired;
         }
     }
 }
