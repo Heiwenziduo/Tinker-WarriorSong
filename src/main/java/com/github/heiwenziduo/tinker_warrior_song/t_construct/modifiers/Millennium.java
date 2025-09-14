@@ -49,6 +49,19 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 
+/*
+  09/14:
+  高等级保留低等级效果
+  E:   + 10% 攻
+  D:   提高至 + 30% 攻  + 0.1 攻速
+  C:   提高至 + 100% 攻  + 0.4 攻速
+  B:   提高至 + 1.0 攻速, 攻击窃取目标2秒时间
+  A:   提高至 + 200% 攻, 所有攻击特效额外触发两次
+  S:   攻击为真实伤害且无视无敌帧
+  SS:  所有其他词条等级为Ⅲ倍, 千年的时间不再减少
+  SSS: (被动) + 10 升级槽、能力槽、刻印次数
+ */
+
 /// 千年, 即 630,720,000,000 tick
 public class Millennium extends NoLevelsModifier implements
         KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook, MeleeHitModifierHook, AttributesModifierHook
@@ -300,7 +313,7 @@ public class Millennium extends NoLevelsModifier implements
 //        SS ("SS",  63072000000f,  2.0f, 1.0f),
 //        S  ("S",   6307200000f,   2.0f, 1.0f),
 //        A  ("A",   630720000f,    2.0f, 1.0f),
-//        B  ("B",   63072000f,     1.5f, 1.0f),
+//        B  ("B",   63072000f,     1.0f, 1.0f),
 //        C  ("C",   6307200f,      1.0f, 0.4f),
 //        D  ("D",   630720f,       0.3f, 0.1f),
 //        E  ("E",   0f,            0.1f, 0.0f);
