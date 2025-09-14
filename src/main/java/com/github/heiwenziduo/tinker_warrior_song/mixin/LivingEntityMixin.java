@@ -55,78 +55,12 @@ public abstract class LivingEntityMixin extends Entity implements LivingEntityMi
 
     @Inject(method = "baseTick", at = @At("HEAD"), cancellable = true)
     public void timeLockBaseTick(CallbackInfo ci) {
-        if (false) {
-            TWS$timeLockManager.timeLockDecrement();
 
-            // tinker after-melee hook do Only in server side, sad
-            if (tickCount % 10 == 0) {
-                for (int i = 0; i < 5; i++) {
-                    level().addParticle(
-                            ParticleTypes.DRAGON_BREATH,
-                            getX()+ random.nextDouble(),
-                            getY()+ random.nextDouble(),
-                            getZ()+ random.nextDouble(),
-                            0,
-                            .5,
-                            0
-                    );
-                }
-
-                for (int i = 0; i < 5; i++) {
-                    ((ServerLevel) level()).sendParticles(
-                            ParticleTypes.DRAGON_BREATH,
-                            getX()+ random.nextDouble(),
-                            getY()+ random.nextDouble(),
-                            getZ()+ random.nextDouble(),
-                            1,
-                            0,
-                            .5,
-                            0,
-                            1
-                    );
-                }
-            }
-
-            // if is locked, apply some base tick logic, like reducing invulnerable time.
-            // from LivingEntity#baseTick
-            {
-                if (this.hurtTime > 0) {
-                    --this.hurtTime;
-                }
-                // ServerPlayer 的 invulnerable-- 在 tick() 中, 暂时不管它
-//                if (this.invulnerableTime > 0 && !(this instanceof ServerPlayer)) {
-//                    --this.invulnerableTime;
-//                }
-                if (this.invulnerableTime > 0) {
-                    --this.invulnerableTime;
-                }
-                if (this.isDeadOrDying() && this.level().shouldTickDeath(this)) {
-                    this.tickDeath();
-                }
-                if (this.lastHurtByPlayerTime > 0) {
-                    --this.lastHurtByPlayerTime;
-                } else {
-                    this.lastHurtByPlayer = null;
-                }
-                if (this.lastHurtMob != null && !this.lastHurtMob.isAlive()) {
-                    this.lastHurtMob = null;
-                }
-                if (this.lastHurtByMob != null) {
-                    if (!this.lastHurtByMob.isAlive()) {
-                        this.setLastHurtByMob((LivingEntity)null);
-                    } else if (this.tickCount - this.lastHurtByMobTimestamp > 100) {
-                        this.setLastHurtByMob((LivingEntity)null);
-                    }
-                }
-            }
-
-
-            ci.cancel();
-        }
     }
 
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     public void timeLockTick(CallbackInfo ci) {
+        // 似乎也会插入所有子类的开头 ?
         if (TWS$getTimeLockManager().isTimeLocked()) {
             TWS$timeLockManager.timeLockDecrement();
 
@@ -193,6 +127,7 @@ public abstract class LivingEntityMixin extends Entity implements LivingEntityMi
             }
 
 
+            // 中断
             ci.cancel();
         }
     }

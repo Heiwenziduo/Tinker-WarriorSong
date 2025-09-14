@@ -10,17 +10,23 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import org.jetbrains.annotations.Nullable;
 import slimeknights.mantle.client.TooltipKey;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.library.modifiers.ModifierHooks;
+import slimeknights.tconstruct.library.modifiers.hook.behavior.AttributesModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.combat.MeleeHitModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.display.TooltipModifierHook;
@@ -40,10 +46,12 @@ import slimeknights.tconstruct.tools.stats.ToolType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.BiConsumer;
 
 /// 千年, 即 630,720,000,000 tick
 public class Millennium extends NoLevelsModifier implements
-        KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook, MeleeHitModifierHook
+        KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook, MeleeHitModifierHook, AttributesModifierHook
 {
     public static final ToolType[] CAN_BE_USE_ON_TYPES = {ToolType.MELEE};
     public static final int TickConsumePerT = 1;
@@ -52,6 +60,17 @@ public class Millennium extends NoLevelsModifier implements
     private static final ResourceLocation MILLENNIUM_ACTIVE = ResourceLocation.fromNamespaceAndPath(TinkerWarriorSong.ModId, "millennium_active");
     private static final ResourceLocation MILLENNIUM_RANK = ResourceLocation.fromNamespaceAndPath(TinkerWarriorSong.ModId, "millennium_rank");
 
+    // from @DamageSpeedTradeModifier
+    private final Lazy<UUID> uuid = Lazy.of(() -> UUID.nameUUIDFromBytes(getId().toString().getBytes()));
+    private final Lazy<String> attack_damage = Lazy.of(() -> {
+        ResourceLocation id = getId();
+        return id.getPath() + "." + id.getNamespace() + ".attack_damage";
+    });
+    private final Lazy<String> attack_speed = Lazy.of(() -> {
+        ResourceLocation id = getId();
+        return id.getPath() + "." + id.getNamespace() + ".attack_speed";
+    });
+
     @Override
     public int getPriority() {
         return 1;
@@ -59,32 +78,49 @@ public class Millennium extends NoLevelsModifier implements
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
-        hookBuilder.addHook(this, InitHook.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT);
+        hookBuilder.addHook(this, InitHook.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT, ModifierHooks.ATTRIBUTES);
+    }
+
+
+    @Override
+    public void addAttributes(IToolStackView tool, ModifierEntry modifier, EquipmentSlot slot, BiConsumer<Attribute, AttributeModifier> consumer) {
+        // runs everyTick, this method is good.
+        if (slot == EquipmentSlot.MAINHAND && isActive(tool)){
+            RANK R = calculateRank(tool);
+            consumer.accept(Attributes.ATTACK_DAMAGE, new AttributeModifier(uuid.get(), attack_damage.get(), R.attackDamage, AttributeModifier.Operation.MULTIPLY_TOTAL));
+            consumer.accept(Attributes.ATTACK_SPEED, new AttributeModifier(uuid.get(), attack_speed.get(), R.attackSpeed, AttributeModifier.Operation.ADDITION));
+        }
     }
 
     @Override
     public void addToolStats(IToolContext context, ModifierEntry modifier, ModifierStatsBuilder builder) {
         // "Called whenever tool stats are rebuilt."
-        // todo: consider @AttributesModifierHook
+
+        // 09/14 toolStats 好像不能动态更新 ?
+        /*
+        boolean isA = context.getPersistentData().getBoolean(MILLENNIUM_ACTIVE);
         System.out.println("addToolStats: " + context.getPersistentData().getBoolean(MILLENNIUM_ACTIVE)); // false, then stop update
-        if(!context.getPersistentData().getBoolean(MILLENNIUM_ACTIVE)) return;
-        //HookHelper.runAddToolStats(context, modifier, builder);
-        String rankName = context.getPersistentData().getString(MILLENNIUM_RANK);
-        System.out.println("addToolStats: " + rankName);
-        if (rankName.isEmpty()) rankName = RANK.E.name;
-        RANK R = RANK.fromName(rankName);
-        HookHelper.runAddToolStats(R, modifier, builder);
+        if(isA){
+            String rankName = context.getPersistentData().getString(MILLENNIUM_RANK);
+            System.out.println("addToolStats: " + rankName);
+            if (rankName.isEmpty()) rankName = RANK.E.name;
+            RANK R = RANK.fromName(rankName);
+            HookHelper.runAddToolStats(R, modifier, builder);
+        }
+        */
     }
 
     @Override
     public void afterMeleeHit(IToolStackView tool, ModifierEntry modifier, ToolAttackContext context, float damageDealt) {
+        if (!canModified(tool)) return;
+        if (!isActive(tool)) return;
+
         LivingEntity target = context.getLivingTarget();
         if (target != null) {
+            HookHelper.runAfterMeleeHit(tool, target);
 
-            ManagerAbbr.setTimeLock(target, 200);
-
-            LivingEntity attacker = context.getAttacker();
-            ToolDamageUtil.damageAnimated(tool, 2, attacker, context.getSlotType());
+            // LivingEntity attacker = context.getAttacker();
+            // ToolDamageUtil.damageAnimated(tool, 2, attacker, context.getSlotType());
         }
     }
 
@@ -93,16 +129,15 @@ public class Millennium extends NoLevelsModifier implements
         if (!canModified(tool)) return;
 
         if(event.getSource().getEntity() == attacker) {
-            float time0 = tool.getPersistentData().getFloat(MILLENNIUM_TIME);
             float addTime = target.tickCount;
-            System.out.println(time0+ " : " +addTime);
+            reapTime(tool, addTime);
 
             // 其实nan检测不必要, 懒得改了
-            if (!Float.isNaN(time0)){
-                tool.getPersistentData().putFloat(MILLENNIUM_TIME, time0 + addTime);
-            } else {
-                tool.getPersistentData().putFloat(MILLENNIUM_TIME, addTime);
-            }
+//            if (!Float.isNaN(time0)){
+//                tool.getPersistentData().putFloat(MILLENNIUM_TIME, time0 + addTime);
+//            } else {
+//                tool.getPersistentData().putFloat(MILLENNIUM_TIME, addTime);
+//            }
         }
     }
 
@@ -212,6 +247,13 @@ public class Millennium extends NoLevelsModifier implements
         return type != null;
     }
 
+    private static void reapTime(IToolStackView tool, float time) {
+        float time0 = tool.getPersistentData().getFloat(MILLENNIUM_TIME);
+        System.out.println("reapTime: " + time0 + " += " + time);
+
+        tool.getPersistentData().putFloat(MILLENNIUM_TIME, time0 + time);
+    }
+
     // ****************************************************************************
     private static class HookHelper {
         public static void calculateTooltip() {
@@ -241,19 +283,41 @@ public class Millennium extends NoLevelsModifier implements
             }
         }
 
+        public static void runAfterMeleeHit(IToolStackView tool, LivingEntity target) {
+            RANK R = calculateRank(tool);
+            switch (R) {
+                case B, A, S, SS, SSS -> {
+                    ManagerAbbr.setTimeLock(target, 40);
+                    reapTime(tool, 40);
+                }
+            }
+        }
+
     }
 
     public enum RANK {
-        SSS("SSS", 630720000000f),
-        SS ("SS",  63072000000f),
-        S  ("S",   6307200000f),
-        A  ("A",   630720000f),
-        B  ("B",   63072000f),
-        C  ("C",   6307200f),
-        D  ("D",   630720f),
-        E  ("E",   0f);
+//        SSS("SSS", 630720000000f, 2.0f, 1.0f),
+//        SS ("SS",  63072000000f,  2.0f, 1.0f),
+//        S  ("S",   6307200000f,   2.0f, 1.0f),
+//        A  ("A",   630720000f,    2.0f, 1.0f),
+//        B  ("B",   63072000f,     1.5f, 1.0f),
+//        C  ("C",   6307200f,      1.0f, 0.4f),
+//        D  ("D",   630720f,       0.3f, 0.1f),
+//        E  ("E",   0f,            0.1f, 0.0f);
+
+        // for the sake of test
+        SSS("SSS", 6307f, 2.0f, 0.4f),
+        SS ("SS",  630f,  2.0f, 0.4f),
+        S  ("S",   630f,   2.0f, 0.4f),
+        A  ("A",   630f,    2.0f, 0.4f),
+        B  ("B",   630f,     2.0f, 0.4f),
+        C  ("C",   630f,      2.0f, 0.4f),
+        D  ("D",   63f,       1.3f, 0.1f),
+        E  ("E",   0f,            1.1f, 0.0f);
 
         public final float tickRequired;
+        public final float attackDamage;
+        public final float attackSpeed;
         public final String name;
 
         public RANK nextRank() {
@@ -271,9 +335,11 @@ public class Millennium extends NoLevelsModifier implements
             return RANK.E;
         }
 
-        RANK(String name, float tickRequired) {
+        RANK(String name, float tickRequired, float attackDamage, float attackSpeed) {
             this.name = name;
             this.tickRequired = tickRequired;
+            this.attackDamage = attackDamage;
+            this.attackSpeed = attackSpeed;
         }
     }
 }
