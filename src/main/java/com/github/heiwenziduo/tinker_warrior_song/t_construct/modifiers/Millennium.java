@@ -1,6 +1,7 @@
 package com.github.heiwenziduo.tinker_warrior_song.t_construct.modifiers;
 
 import com.github.heiwenziduo.tinker_warrior_song.TinkerWarriorSong;
+import com.github.heiwenziduo.tinker_warrior_song.api.ManagerAbbr;
 import com.github.heiwenziduo.tinker_warrior_song.initializer.InitHook;
 import com.github.heiwenziduo.tinker_warrior_song.t_construct.hooks.KillingHook;
 import net.minecraft.network.chat.Component;
@@ -21,12 +22,15 @@ import slimeknights.mantle.client.TooltipKey;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.library.modifiers.ModifierHooks;
 import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
+import slimeknights.tconstruct.library.modifiers.hook.combat.MeleeHitModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.display.TooltipModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.interaction.GeneralInteractionModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.interaction.InteractionSource;
 import slimeknights.tconstruct.library.modifiers.hook.interaction.InventoryTickModifierHook;
 import slimeknights.tconstruct.library.modifiers.impl.NoLevelsModifier;
 import slimeknights.tconstruct.library.module.ModuleHookMap;
+import slimeknights.tconstruct.library.tools.context.ToolAttackContext;
+import slimeknights.tconstruct.library.tools.helper.ToolDamageUtil;
 import slimeknights.tconstruct.library.tools.nbt.IToolContext;
 import slimeknights.tconstruct.library.tools.nbt.IToolStackView;
 import slimeknights.tconstruct.library.tools.stat.ModifierStatsBuilder;
@@ -39,7 +43,7 @@ import java.util.Objects;
 
 /// 千年, 即 630,720,000,000 tick
 public class Millennium extends NoLevelsModifier implements
-        KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook
+        KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook, MeleeHitModifierHook
 {
     public static final ToolType[] CAN_BE_USE_ON_TYPES = {ToolType.MELEE};
     public static final int TickConsumePerT = 1;
@@ -55,7 +59,7 @@ public class Millennium extends NoLevelsModifier implements
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
-        hookBuilder.addHook(this, InitHook.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS);
+        hookBuilder.addHook(this, InitHook.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT);
     }
 
     @Override
@@ -70,6 +74,18 @@ public class Millennium extends NoLevelsModifier implements
         if (rankName.isEmpty()) rankName = RANK.E.name;
         RANK R = RANK.fromName(rankName);
         HookHelper.runAddToolStats(R, modifier, builder);
+    }
+
+    @Override
+    public void afterMeleeHit(IToolStackView tool, ModifierEntry modifier, ToolAttackContext context, float damageDealt) {
+        LivingEntity target = context.getLivingTarget();
+        if (target != null) {
+
+            ManagerAbbr.setTimeLock(target, 200);
+
+            LivingEntity attacker = context.getAttacker();
+            ToolDamageUtil.damageAnimated(tool, 2, attacker, context.getSlotType());
+        }
     }
 
     @Override
