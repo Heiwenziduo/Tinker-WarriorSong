@@ -56,7 +56,7 @@ import java.util.function.BiConsumer;
   D:   提高至 + 30% 攻  + 0.1 攻速
   C:   提高至 + 100% 攻  + 0.4 攻速
   B:   提高至 + 1.0 攻速, 攻击窃取目标2秒时间
-  A:   提高至 + 200% 攻, 所有攻击特效额外触发2次
+  A:   提高至 + 200% 攻, 所有攻击特效额外触发1次
   S:   攻击为真实伤害且无视无敌帧
   SS:  所有其他词条等级为Ⅲ倍, 千年的时间不再减少
   SSS: (被动) + 10 升级槽、能力槽、刻印次数
@@ -67,7 +67,7 @@ public class Millennium extends NoLevelsModifier implements
         KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook, MeleeHitModifierHook, AttributesModifierHook, MeleeDamageModifierHook
 {
     public static final ToolType[] CAN_BE_USE_ON_TYPES = {ToolType.MELEE};
-    public static final int TickConsumePerT = 1;
+    public static final int TickConsumePerT = 10;
     public static final int RankAAttackMultiply = 2;
 
     private static final ResourceLocation MILLENNIUM_TIME = ResourceLocation.fromNamespaceAndPath(TinkerWarriorSong.ModId, "millennium_time");
@@ -210,18 +210,12 @@ public class Millennium extends NoLevelsModifier implements
         if(event.getSource().getEntity() == attacker) {
             float addTime = target.tickCount;
             reapTime(tool, addTime);
-
-            // 其实nan检测不必要, 懒得改了
-//            if (!Float.isNaN(time0)){
-//                tool.getPersistentData().putFloat(MILLENNIUM_TIME, time0 + addTime);
-//            } else {
-//                tool.getPersistentData().putFloat(MILLENNIUM_TIME, addTime);
-//            }
         }
     }
 
     @Override
     public void onInventoryTick(IToolStackView tool, ModifierEntry modifier, Level world, LivingEntity holder, int itemSlot, boolean isSelected, boolean isCorrectSlot, ItemStack stack) {
+        // if (!(holder instanceof Player player)) return;
         if (!canModified(tool)) return;
         if (!isActive(tool)) return;
         // tick会在客户端执行
@@ -241,18 +235,21 @@ public class Millennium extends NoLevelsModifier implements
             }
             return;
         }
-        // if (holder.tickCount % 100 == 0) calculateRankAndSave(tool);
-        // if (!(holder instanceof Player player)) return;
+        //if (holder.tickCount % 60 == 0) calculateRankAndSave(tool);
 
-
-        float time = tool.getPersistentData().getFloat(MILLENNIUM_TIME);
-        if (time >= TickConsumePerT) {
-            time -= TickConsumePerT;
-        } else {
-            time = 0;
-            setActive(tool, false, holder);
+        RANK R = calculateRank(tool);
+        int cpuSaver = 5;
+        if (R != RANK.SS && R != RANK.SSS && holder.tickCount % cpuSaver == 0) {
+            // SS 级后, 千年的时间不再减少
+            float time = tool.getPersistentData().getFloat(MILLENNIUM_TIME);
+            if (time >= TickConsumePerT * cpuSaver) {
+                time -= TickConsumePerT * cpuSaver;
+            } else {
+                time = 0;
+                setActive(tool, false, holder);
+            }
+            tool.getPersistentData().putFloat(MILLENNIUM_TIME, time);
         }
-        tool.getPersistentData().putFloat(MILLENNIUM_TIME, time);
     }
 
     @Override
@@ -298,7 +295,6 @@ public class Millennium extends NoLevelsModifier implements
     private static RANK calculateRankAndSave(IToolStackView tool) {
         RANK R = calculateRank(tool);
         tool.getPersistentData().putString(MILLENNIUM_RANK, R.name);
-        System.out.println("calculateRankAndSave: " + R.name);
         return R;
     }
     private static RANK calculateRank(IToolStackView tool) {
@@ -351,62 +347,6 @@ public class Millennium extends NoLevelsModifier implements
     }
 
     // ****************************************************************************
-    private static class HookHelper {
-        public static void calculateTooltip() {
-
-        }
-
-        public static void runAddToolStats(IToolContext context, ModifierEntry modifier, ModifierStatsBuilder builder) {
-            float ticks = context.getPersistentData().getFloat(MILLENNIUM_TIME);
-            RANK R = calculateRank(ticks);
-            runAddToolStats(R, modifier, builder);
-        }
-        public static void runAddToolStats(RANK R, ModifierEntry modifier, ModifierStatsBuilder builder) {
-            System.out.println("runAddToolStats: " + R.name);
-            switch (R) {
-                case E -> {
-                    ToolStats.ATTACK_DAMAGE.multiplyAll(builder, 1.1);
-                    ToolStats.ATTACK_SPEED.add(builder, 0);
-                }
-                case D -> {
-                    ToolStats.ATTACK_DAMAGE.multiplyAll(builder, 1.3);
-                    ToolStats.ATTACK_SPEED.add(builder, 0.1);
-                }
-                case C, B, A, S, SS, SSS -> {
-                    ToolStats.ATTACK_DAMAGE.multiplyAll(builder, 2);
-                    ToolStats.ATTACK_SPEED.add(builder, 0.4);
-                }
-            }
-        }
-
-        public static void runBeforeMeleeHit(IToolStackView tool, LivingEntity target, ToolAttackContext context, float damage, float knockback) {
-            RANK R = calculateRank(tool);
-            switch (R) {
-                case A, S, SS, SSS -> {
-                    if (R != RANK.A) target.invulnerableTime = 0;
-
-                    float baseDamage = damage;
-                    // 将所有攻击钩子翻倍
-                    List<ModifierEntry> modifiers = tool.getModifierList();
-                    for (ModifierEntry entry : modifiers){
-
-                    }
-                }
-            }
-        }
-
-        public static void runAfterMeleeHit(IToolStackView tool, LivingEntity target) {
-            RANK R = calculateRank(tool);
-            switch (R) {
-                case B, A, S, SS, SSS -> {
-                    ManagerAbbr.setTimeLock(target, 40);
-                    reapTime(tool, 40);
-                }
-            }
-        }
-
-    }
-
     public enum RANK {
 //        SSS("SSS", 630720000000f, 2.0f, 1.0f),
 //        SS ("SS",  63072000000f,  2.0f, 1.0f),
