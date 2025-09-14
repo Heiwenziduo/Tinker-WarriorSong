@@ -4,10 +4,12 @@ import com.github.heiwenziduo.tinker_warrior_song.TinkerWarriorSong;
 import com.github.heiwenziduo.tinker_warrior_song.api.ManagerAbbr;
 import com.github.heiwenziduo.tinker_warrior_song.initializer.InitHook;
 import com.github.heiwenziduo.tinker_warrior_song.t_construct.hooks.KillingHook;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -28,6 +30,7 @@ import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.library.modifiers.ModifierHooks;
 import slimeknights.tconstruct.library.modifiers.hook.behavior.AttributesModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
+import slimeknights.tconstruct.library.modifiers.hook.combat.MeleeDamageModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.combat.MeleeHitModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.display.TooltipModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.interaction.GeneralInteractionModifierHook;
@@ -43,10 +46,7 @@ import slimeknights.tconstruct.library.tools.stat.ModifierStatsBuilder;
 import slimeknights.tconstruct.library.tools.stat.ToolStats;
 import slimeknights.tconstruct.tools.stats.ToolType;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.BiConsumer;
 
 /*
@@ -56,7 +56,7 @@ import java.util.function.BiConsumer;
   D:   提高至 + 30% 攻  + 0.1 攻速
   C:   提高至 + 100% 攻  + 0.4 攻速
   B:   提高至 + 1.0 攻速, 攻击窃取目标2秒时间
-  A:   提高至 + 200% 攻, 所有攻击特效额外触发两次
+  A:   提高至 + 200% 攻, 所有攻击特效额外触发2次
   S:   攻击为真实伤害且无视无敌帧
   SS:  所有其他词条等级为Ⅲ倍, 千年的时间不再减少
   SSS: (被动) + 10 升级槽、能力槽、刻印次数
@@ -64,10 +64,11 @@ import java.util.function.BiConsumer;
 
 /// 千年, 即 630,720,000,000 tick
 public class Millennium extends NoLevelsModifier implements
-        KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook, MeleeHitModifierHook, AttributesModifierHook
+        KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook, MeleeHitModifierHook, AttributesModifierHook, MeleeDamageModifierHook
 {
     public static final ToolType[] CAN_BE_USE_ON_TYPES = {ToolType.MELEE};
     public static final int TickConsumePerT = 1;
+    public static final int RankAAttackMultiply = 2;
 
     private static final ResourceLocation MILLENNIUM_TIME = ResourceLocation.fromNamespaceAndPath(TinkerWarriorSong.ModId, "millennium_time");
     private static final ResourceLocation MILLENNIUM_ACTIVE = ResourceLocation.fromNamespaceAndPath(TinkerWarriorSong.ModId, "millennium_active");
@@ -91,7 +92,7 @@ public class Millennium extends NoLevelsModifier implements
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
-        hookBuilder.addHook(this, InitHook.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT, ModifierHooks.ATTRIBUTES);
+        hookBuilder.addHook(this, InitHook.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT, ModifierHooks.ATTRIBUTES, ModifierHooks.MELEE_DAMAGE);
     }
 
 
@@ -124,13 +125,78 @@ public class Millennium extends NoLevelsModifier implements
     }
 
     @Override
+    public float getMeleeDamage(IToolStackView tool, ModifierEntry modifier, ToolAttackContext context, float baseDamage, float damage) {
+        if (!isActive(tool)) return damage;
+
+        LivingEntity target = context.getLivingTarget();
+        if (target != null) {
+            RANK R = calculateRank(tool);
+            switch (R) {
+                case A, S, SS, SSS -> {
+                    // 将所有攻击钩子翻倍
+                    List<ModifierEntry> modifiers = tool.getModifierList();
+                    for (ModifierEntry entry : modifiers){
+                        if (!entry.matches(this)){
+                            for (int i = 0; i < RankAAttackMultiply; i++) {
+                                damage = entry.getHook(ModifierHooks.MELEE_DAMAGE).getMeleeDamage(tool, entry, context, baseDamage, damage);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return damage;
+    };
+
+    @Override
+    public float beforeMeleeHit(IToolStackView tool, ModifierEntry modifier, ToolAttackContext context, float damage, float baseKnockback, float knockback) {
+        if (!isActive(tool)) return knockback;
+
+        LivingEntity target = context.getLivingTarget();
+        if (target != null) {
+            RANK R = calculateRank(tool);
+            switch (R) {
+                case A, S, SS, SSS -> {
+                    if (R != RANK.A) target.invulnerableTime = 0;
+
+                    List<ModifierEntry> modifiers = tool.getModifierList();
+                    for (ModifierEntry entry : modifiers){
+                        if (!entry.matches(this)){
+                            for (int i = 0; i < RankAAttackMultiply; i++) {
+                                knockback = entry.getHook(ModifierHooks.MELEE_HIT).beforeMeleeHit(tool, entry, context, damage, baseKnockback, knockback);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return knockback;
+    }
+
+    @Override
     public void afterMeleeHit(IToolStackView tool, ModifierEntry modifier, ToolAttackContext context, float damageDealt) {
-        if (!canModified(tool)) return;
         if (!isActive(tool)) return;
 
         LivingEntity target = context.getLivingTarget();
         if (target != null) {
-            HookHelper.runAfterMeleeHit(tool, target);
+            RANK R = calculateRank(tool);
+            switch (R) {
+                case B, A, S, SS, SSS -> {
+                    ManagerAbbr.setTimeLock(target, 40);
+                    reapTime(tool, 40);
+
+                    if (R != RANK.B) {
+                        List<ModifierEntry> modifiers = tool.getModifierList();
+                        for (ModifierEntry entry : modifiers){
+                            if (!entry.matches(this)){
+                                for (int i = 0; i < RankAAttackMultiply; i++) {
+                                    entry.getHook(ModifierHooks.MELEE_HIT).afterMeleeHit(tool, entry, context, damageDealt);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             // LivingEntity attacker = context.getAttacker();
             // ToolDamageUtil.damageAnimated(tool, 2, attacker, context.getSlotType());
@@ -157,11 +223,27 @@ public class Millennium extends NoLevelsModifier implements
     @Override
     public void onInventoryTick(IToolStackView tool, ModifierEntry modifier, Level world, LivingEntity holder, int itemSlot, boolean isSelected, boolean isCorrectSlot, ItemStack stack) {
         if (!canModified(tool)) return;
-        if(world.isClientSide) return;  // tick会在客户端执行
-        if (holder.tickCount % 100 == 0) calculateRankAndSave(tool);
+        if (!isActive(tool)) return;
+        // tick会在客户端执行
+        if(world.isClientSide && isSelected && holder.tickCount % 20 == 0) {
+            // 激活的千年将放出粒子效果
+            for (int i = 0; i < 6; i++) {
+                RandomSource random = RandomSource.create();
+                world.addParticle(
+                        ParticleTypes.ENCHANT,
+                        holder.getX() + random.nextDouble(),
+                        holder.getY() + random.nextDouble(),
+                        holder.getZ() + random.nextDouble(),
+                        0,
+                        .5,
+                        0
+                );
+            }
+            return;
+        }
+        // if (holder.tickCount % 100 == 0) calculateRankAndSave(tool);
         // if (!(holder instanceof Player player)) return;
 
-        if (!isActive(tool)) return;
 
         float time = tool.getPersistentData().getFloat(MILLENNIUM_TIME);
         if (time >= TickConsumePerT) {
@@ -260,6 +342,7 @@ public class Millennium extends NoLevelsModifier implements
         return type != null;
     }
 
+    // 死神, 来收人了...
     private static void reapTime(IToolStackView tool, float time) {
         float time0 = tool.getPersistentData().getFloat(MILLENNIUM_TIME);
         System.out.println("reapTime: " + time0 + " += " + time);
@@ -292,6 +375,22 @@ public class Millennium extends NoLevelsModifier implements
                 case C, B, A, S, SS, SSS -> {
                     ToolStats.ATTACK_DAMAGE.multiplyAll(builder, 2);
                     ToolStats.ATTACK_SPEED.add(builder, 0.4);
+                }
+            }
+        }
+
+        public static void runBeforeMeleeHit(IToolStackView tool, LivingEntity target, ToolAttackContext context, float damage, float knockback) {
+            RANK R = calculateRank(tool);
+            switch (R) {
+                case A, S, SS, SSS -> {
+                    if (R != RANK.A) target.invulnerableTime = 0;
+
+                    float baseDamage = damage;
+                    // 将所有攻击钩子翻倍
+                    List<ModifierEntry> modifiers = tool.getModifierList();
+                    for (ModifierEntry entry : modifiers){
+
+                    }
                 }
             }
         }
