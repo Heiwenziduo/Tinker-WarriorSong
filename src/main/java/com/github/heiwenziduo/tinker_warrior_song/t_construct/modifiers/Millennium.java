@@ -2,7 +2,7 @@ package com.github.heiwenziduo.tinker_warrior_song.t_construct.modifiers;
 
 import com.github.heiwenziduo.tinker_warrior_song.TinkerWarriorSong;
 import com.github.heiwenziduo.tinker_warrior_song.api.ManagerAbbr;
-import com.github.heiwenziduo.tinker_warrior_song.initializer.InitHook;
+import com.github.heiwenziduo.tinker_warrior_song.t_construct.hooks.TWSHooks;
 import com.github.heiwenziduo.tinker_warrior_song.t_construct.hooks.KillingHook;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -39,11 +39,9 @@ import slimeknights.tconstruct.library.modifiers.hook.interaction.InventoryTickM
 import slimeknights.tconstruct.library.modifiers.impl.NoLevelsModifier;
 import slimeknights.tconstruct.library.module.ModuleHookMap;
 import slimeknights.tconstruct.library.tools.context.ToolAttackContext;
-import slimeknights.tconstruct.library.tools.helper.ToolDamageUtil;
 import slimeknights.tconstruct.library.tools.nbt.IToolContext;
 import slimeknights.tconstruct.library.tools.nbt.IToolStackView;
 import slimeknights.tconstruct.library.tools.stat.ModifierStatsBuilder;
-import slimeknights.tconstruct.library.tools.stat.ToolStats;
 import slimeknights.tconstruct.tools.stats.ToolType;
 
 import java.util.*;
@@ -92,7 +90,7 @@ public class Millennium extends NoLevelsModifier implements
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
-        hookBuilder.addHook(this, InitHook.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT, ModifierHooks.ATTRIBUTES, ModifierHooks.MELEE_DAMAGE);
+        hookBuilder.addHook(this, TWSHooks.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT, ModifierHooks.ATTRIBUTES, ModifierHooks.MELEE_DAMAGE);
     }
 
 
