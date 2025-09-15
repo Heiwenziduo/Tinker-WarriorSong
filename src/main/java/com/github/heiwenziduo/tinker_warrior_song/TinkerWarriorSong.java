@@ -1,6 +1,7 @@
 package com.github.heiwenziduo.tinker_warrior_song;
 
 import com.github.heiwenziduo.tinker_warrior_song.initializer.InitModifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -10,6 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
+/// {@link slimeknights.tconstruct.TConstruct}
 @Mod(TinkerWarriorSong.ModId)
 public class TinkerWarriorSong {
     public static final String ModId = "tinker_warrior_song";
@@ -23,18 +25,13 @@ public class TinkerWarriorSong {
         MinecraftForge.EVENT_BUS.register(this);
     }
 
-    // You can use SubscribeEvent and let the Event Bus discover methods to call
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
-        // Do something when the server starts
-    }
 
-    // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
-    @Mod.EventBusSubscriber(modid = ModId, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    public static class ClientModEvents {
-        @SubscribeEvent
-        public static void onClientSetup(FMLClientSetupEvent event) {
-            // Some client setup code
-        }
+    /**
+     * Gets a resource location for Tinkers
+     * @param name  Resource path
+     * @return  Location for tinkers
+     */
+    public static ResourceLocation getResource(String name) {
+        return ResourceLocation.fromNamespaceAndPath(ModId, name);
     }
 }
