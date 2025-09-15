@@ -117,7 +117,7 @@ public class Millennium extends NoLevelsModifier implements
         if(isA){
             String rankName = context.getPersistentData().getString(MILLENNIUM_RANK);
             System.out.println("addToolStats: " + rankName);
-            if (rankName.isEmpty()) rankName = RANK.E.name;
+            if (rankName.isEmpty()) rankName = RANK.E.name();
             RANK R = RANK.fromName(rankName);
             HookHelper.runAddToolStats(R, modifier, builder);
         }
@@ -294,7 +294,7 @@ public class Millennium extends NoLevelsModifier implements
 
     private static RANK calculateRankAndSave(IToolStackView tool) {
         RANK R = calculateRank(tool);
-        tool.getPersistentData().putString(MILLENNIUM_RANK, R.name);
+        tool.getPersistentData().putString(MILLENNIUM_RANK, R.name());
         return R;
     }
     private static RANK calculateRank(IToolStackView tool) {
@@ -348,38 +348,38 @@ public class Millennium extends NoLevelsModifier implements
 
     // ****************************************************************************
     public enum RANK {
-//        SSS("SSS", 630720000000f, 2.0f, 1.0f),
-//        SS ("SS",  63072000000f,  2.0f, 1.0f),
-//        S  ("S",   6307200000f,   2.0f, 1.0f),
-//        A  ("A",   630720000f,    2.0f, 1.0f),
-//        B  ("B",   63072000f,     1.0f, 1.0f),
-//        C  ("C",   6307200f,      1.0f, 0.4f),
-//        D  ("D",   630720f,       0.3f, 0.1f),
-//        E  ("E",   0f,            0.1f, 0.0f);
+//        SSS(630720000000f, 2.0f, 1.0f),
+//        SS (63072000000f,  2.0f, 1.0f),
+//        S  (6307200000f,   2.0f, 1.0f),
+//        A  (630720000f,    2.0f, 1.0f),
+//        B  (63072000f,     1.0f, 1.0f),
+//        C  (6307200f,      1.0f, 0.4f),
+//        D  (630720f,       0.3f, 0.1f),
+//        E  (0f,            0.1f, 0.0f);
 
         // for the sake of test
-        SSS("SSS", 6307f, 2.0f, 0.4f),
-        SS ("SS",  630f,  2.0f, 0.4f),
-        S  ("S",   630f,   2.0f, 0.4f),
-        A  ("A",   630f,    2.0f, 0.4f),
-        B  ("B",   630f,     2.0f, 0.4f),
-        C  ("C",   630f,      2.0f, 0.4f),
-        D  ("D",   63f,       1.3f, 0.1f),
-        E  ("E",   0f,            1.1f, 0.0f);
+        INFINITE(Float.MAX_VALUE, 2.0f, 0.4f),
+        SSS(6307f, 2.0f, 0.4f),
+        SS (630f,  2.0f, 0.4f),
+        S  (630f,   2.0f, 0.4f),
+        A  (630f,    2.0f, 0.4f),
+        B  (630f,     2.0f, 0.4f),
+        C  (630f,      2.0f, 0.4f),
+        D  (63f,       1.3f, 0.1f),
+        E  (0f,            1.1f, 0.0f);
 
         public final float tickRequired;
         public final float attackDamage;
         public final float attackSpeed;
-        public final String name;
 
         public RANK nextRank() {
             var l = Arrays.stream(RANK.values()).filter(r -> r.tickRequired > this.tickRequired).toList();
-            return l.isEmpty() ? RANK.SSS : l.get(l.size() - 1);
+            return l.isEmpty() ? RANK.INFINITE : l.get(l.size() - 1);
         }
 
         public static RANK fromName(String name) {
             for (RANK R : RANK.values()) {
-                if (Objects.equals(R.name, name)){
+                if (Objects.equals(R.name(), name)){
                     return R;
                 }
             }
@@ -387,8 +387,7 @@ public class Millennium extends NoLevelsModifier implements
             return RANK.E;
         }
 
-        RANK(String name, float tickRequired, float attackDamage, float attackSpeed) {
-            this.name = name;
+        RANK(float tickRequired, float attackDamage, float attackSpeed) {
             this.tickRequired = tickRequired;
             this.attackDamage = attackDamage;
             this.attackSpeed = attackSpeed;
