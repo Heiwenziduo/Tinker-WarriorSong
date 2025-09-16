@@ -6,7 +6,8 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "tinker_warrior_song.mixin.refmap.json",
   "mixins": [
-    "LivingEntityMixin"
+    "LivingEntityMixin",
+    "TWSPlayerMixin"
   ],
   "client": [],
   "server": [],

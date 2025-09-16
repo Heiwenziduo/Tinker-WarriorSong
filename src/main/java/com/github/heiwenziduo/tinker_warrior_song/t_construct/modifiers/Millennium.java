@@ -2,9 +2,12 @@ package com.github.heiwenziduo.tinker_warrior_song.t_construct.modifiers;
 
 import com.github.heiwenziduo.tinker_warrior_song.TinkerWarriorSong;
 import com.github.heiwenziduo.tinker_warrior_song.api.ManagerAbbr;
+import com.github.heiwenziduo.tinker_warrior_song.data.TWSDamageType;
+import com.github.heiwenziduo.tinker_warrior_song.t_construct.hooks.DamageRedirectHook;
 import com.github.heiwenziduo.tinker_warrior_song.t_construct.hooks.TWSHooks;
 import com.github.heiwenziduo.tinker_warrior_song.t_construct.hooks.KillingHook;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -12,6 +15,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
@@ -47,6 +51,8 @@ import slimeknights.tconstruct.tools.stats.ToolType;
 import java.util.*;
 import java.util.function.BiConsumer;
 
+import static com.github.heiwenziduo.tinker_warrior_song.data.TWSDamageType.PURE;
+
 /*
   09/14:
   高等级保留低等级效果
@@ -62,7 +68,8 @@ import java.util.function.BiConsumer;
 
 /// 千年, 即 630,720,000,000 tick
 public class Millennium extends NoLevelsModifier implements
-        KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook, MeleeHitModifierHook, AttributesModifierHook, MeleeDamageModifierHook
+        KillingHook, TooltipModifierHook, GeneralInteractionModifierHook, InventoryTickModifierHook, ToolStatsModifierHook,
+        MeleeHitModifierHook, AttributesModifierHook, MeleeDamageModifierHook, DamageRedirectHook
 {
     public static final ToolType[] CAN_BE_USE_ON_TYPES = {ToolType.MELEE};
     public static final int TickConsumePerT = 10;
@@ -85,19 +92,30 @@ public class Millennium extends NoLevelsModifier implements
 
     @Override
     public int getPriority() {
-        return 1;
+        return 1000;
     }
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
-        hookBuilder.addHook(this, TWSHooks.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT, ModifierHooks.ATTRIBUTES, ModifierHooks.MELEE_DAMAGE);
+        hookBuilder.addHook(this, TWSHooks.KILLING_HOOK, ModifierHooks.TOOLTIP, ModifierHooks.GENERAL_INTERACT, ModifierHooks.INVENTORY_TICK, ModifierHooks.TOOL_STATS, ModifierHooks.MELEE_HIT, ModifierHooks.ATTRIBUTES, ModifierHooks.MELEE_DAMAGE, TWSHooks.DAMAGE_REDIRECT_HOOK);
     }
 
+    @Override
+    public @Nullable DamageSource redirectDamageSource(IToolStackView tool, LivingEntity attacker, LivingEntity target, int level, DamageSource source) {
+        RANK R = calculateRank(tool);
+        return switch (R) {
+            case S, SS, SSS -> new DamageSource(
+                    attacker.level().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(PURE),
+                    attacker
+            );
+            default -> null;
+        };
+    }
 
     @Override
     public void addAttributes(IToolStackView tool, ModifierEntry modifier, EquipmentSlot slot, BiConsumer<Attribute, AttributeModifier> consumer) {
         // runs everyTick, this method is good.
-        if (slot == EquipmentSlot.MAINHAND && isActive(tool)){
+        if (isActive(tool)){
             RANK R = calculateRank(tool);
             consumer.accept(Attributes.ATTACK_DAMAGE, new AttributeModifier(uuid.get(), attack_damage.get(), R.attackDamage, AttributeModifier.Operation.MULTIPLY_TOTAL));
             consumer.accept(Attributes.ATTACK_SPEED, new AttributeModifier(uuid.get(), attack_speed.get(), R.attackSpeed, AttributeModifier.Operation.ADDITION));

@@ -154,7 +154,6 @@ public abstract class LivingEntityMixin extends Entity implements LivingEntityMi
     @Inject(method = "actuallyHurt", at = @At("HEAD"), cancellable = true)
     public void onTakePureDamage(DamageSource pDamageSource, float pDamageAmount, CallbackInfo ci) {
         if (pDamageSource != null && pDamageSource.is(PURE) && !isInvulnerableTo(pDamageSource)) {
-            float oldDamage = pDamageAmount;
             pDamageAmount = Math.max(net.minecraftforge.common.ForgeHooks.onLivingHurt((LivingEntity) (Object) this, pDamageSource, pDamageAmount), pDamageAmount);
 
             float f1 = Math.max(pDamageAmount - getAbsorptionAmount(), 0.0F);
@@ -178,7 +177,7 @@ public abstract class LivingEntityMixin extends Entity implements LivingEntityMi
                 gameEvent(GameEvent.ENTITY_DAMAGE);
             }
 
-            System.out.println("pureDamage: " + f1);
+            //System.out.println("pureDamage: " + f1);
 
             ci.cancel();
         }
