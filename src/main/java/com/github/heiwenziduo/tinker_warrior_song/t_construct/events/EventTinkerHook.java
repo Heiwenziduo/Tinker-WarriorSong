@@ -26,7 +26,8 @@ public class EventTinkerHook {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void triggerKillingHook(LivingDeathEvent event) {
-        if (event.isCanceled()) return;
+        //if (event.isCanceled()) return;
+        // bug: 死亡钩子在有伤害源重定向时会触发两次
 
         Entity entity = event.getSource().getEntity();
         if (entity instanceof LivingEntity attacker) {
